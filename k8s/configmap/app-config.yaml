@@ -1,0 +1,125 @@
+# 파일 경로: k8s/configmap/app-config.yaml
+# Queue-Based Load Leveling 패턴 애플리케이션 설정
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bss-config
+  namespace: bss-queue-system
+  labels:
+    app: bss-queue-pattern
+    component: config
+data:
+  # RabbitMQ 연결 설정
+  RABBITMQ_HOST: "rabbitmq-service"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_MANAGEMENT_PORT: "15672"
+  RABBITMQ_USERNAME: "admin"
+  RABBITMQ_VHOST: "/"
+  
+  # 큐 설정
+  QUEUE_NAME: "bss_single_queue"
+  QUEUE_DURABLE: "true"
+  QUEUE_AUTO_DELETE: "false"
+  QUEUE_EXCLUSIVE: "false"
+  
+  # 메시지 설정
+  MESSAGE_PERSISTENT: "true"
+  MESSAGE_TTL: "3600000"  # 1시간 (밀리초)
+  MAX_RETRIES: "3"
+  RETRY_DELAY_MS: "5000"
+  
+  # 애플리케이션 설정
+  LOG_LEVEL: "INFO"
+  API_PORT: "8000"
+  METRICS_PORT: "9090"
+  HEALTH_CHECK_PORT: "8080"
+  
+  # 모니터링 설정
+  MONITORING_ENABLED: "true"
+  PROMETHEUS_METRICS_PATH: "/metrics"
+  METRICS_COLLECTION_INTERVAL: "30"  # 초
+  
+  # 처리 설정
+  CONSUMER_PREFETCH_COUNT: "10"
+  BATCH_SIZE: "100"
+  PROCESSING_TIMEOUT_SEC: "300"  # 5분
+  
+  # 스케일링 설정
+  AUTO_SCALING_ENABLED: "true"
+  MIN_REPLICAS: "2"
+  MAX_REPLICAS: "10"
+  TARGET_CPU_UTILIZATION: "70"
+  SCALE_UP_THRESHOLD: "50"  # 큐 메시지 개수
+  SCALE_DOWN_THRESHOLD: "10"
+  
+  # 실험 설정 (패턴 검증용)
+  EXPERIMENT_MODE: "false"
+  LOAD_TEST_ENABLED: "false"
+  PATTERN_VALIDATION_ENABLED: "false"
+
+---
+# Secret - RabbitMQ 비밀번호 및 민감 정보
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bss-secrets
+  namespace: bss-queue-system
+  labels:
+    app: bss-queue-pattern
+    component: secret
+type: Opaque
+data:
+  # base64로 인코딩된 값들 (실제 운영시에는 별도 시크릿 관리 도구 사용 권장)
+  RABBITMQ_PASSWORD: c2VjcmV0cGFzc3dvcmQ=  # secretpassword
+  DATABASE_PASSWORD: ZGJwYXNzd29yZA==      # dbpassword
+  API_SECRET_KEY: YWJjZGVmZ2hpams=          # abcdefghijk
+
+---
+# ConfigMap - 로깅 설정
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logging-config
+  namespace: bss-queue-system
+  labels:
+    app: bss-queue-pattern
+    component: logging
+data:
+  logging.conf: |
+    [loggers]
+    keys=root,bss
+
+    [handlers]
+    keys=console,file
+
+    [formatters]
+    keys=simple,detailed
+
+    [logger_root]
+    level=INFO
+    handlers=console
+
+    [logger_bss]
+    level=INFO
+    handlers=console,file
+    qualname=bss
+    propagate=0
+
+    [handler_console]
+    class=StreamHandler
+    level=INFO
+    formatter=simple
+    args=(sys.stdout,)
+
+    [handler_file]
+    class=FileHandler
+    level=DEBUG
+    formatter=detailed
+    args=('/var/log/bss/app.log', 'a')
+
+    [formatter_simple]
+    format=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+
+    [formatter_detailed]
+    format=%(asctime)s - %(name)s - %(levelname)s - %(module)s - %(funcName)s - %(message)s

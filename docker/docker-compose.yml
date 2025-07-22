@@ -1,0 +1,186 @@
+# 파일 경로: docker/docker-compose.yml
+# 로컬 개발 및 테스트를 위한 Docker Compose 설정
+
+version: '3.8'
+
+services:
+  # RabbitMQ 서비스
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: bss-rabbitmq
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: secretpassword
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"      # AMQP 포트
+      - "15672:15672"    # Management UI 포트
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - bss-network
+
+  # Producer 서비스 (API Gateway)
+  producer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.producer
+    container_name: bss-producer
+    environment:
+      RABBITMQ_URL: amqp://admin:secretpassword@rabbitmq:5672/
+      QUEUE_NAME: bss_single_queue
+      MONITORING_ENABLED: "true"
+      LOG_LEVEL: INFO
+      API_PORT: 8000
+      METRICS_PORT: 9090
+      HEALTH_CHECK_PORT: 8080
+    ports:
+      - "8000:8000"      # API 포트
+      - "9090:9090"      # 메트릭 포트
+      - "8080:8080"      # 헬스 체크 포트
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bss-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 가입 처리 서비스
+  subscription-processor:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.consumer
+    container_name: bss-subscription-processor
+    environment:
+      RABBITMQ_URL: amqp://admin:secretpassword@rabbitmq:5672/
+      QUEUE_NAME: bss_single_queue
+      PROCESSOR_TYPE: SUBSCRIPTION
+      MONITORING_ENABLED: "true"
+      LOG_LEVEL: INFO
+      METRICS_PORT: 9091
+      HEALTH_CHECK_PORT: 8081
+    ports:
+      - "9091:9090"      # 메트릭 포트
+      - "8081:8080"      # 헬스 체크 포트
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bss-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 번호이동 처리 서비스
+  mnp-processor:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.consumer
+    container_name: bss-mnp-processor
+    environment:
+      RABBITMQ_URL: amqp://admin:secretpassword@rabbitmq:5672/
+      QUEUE_NAME: bss_single_queue
+      PROCESSOR_TYPE: MNP
+      MONITORING_ENABLED: "true"
+      LOG_LEVEL: INFO
+      METRICS_PORT: 9092
+      HEALTH_CHECK_PORT: 8082
+    ports:
+      - "9092:9090"      # 메트릭 포트
+      - "8082:8080"      # 헬스 체크 포트
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bss-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 명의변경 처리 서비스
+  change-processor:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.consumer
+    container_name: bss-change-processor
+    environment:
+      RABBITMQ_URL: amqp://admin:secretpassword@rabbitmq:5672/
+      QUEUE_NAME: bss_single_queue
+      PROCESSOR_TYPE: CHANGE
+      MONITORING_ENABLED: "true"
+      LOG_LEVEL: INFO
+      METRICS_PORT: 9093
+      HEALTH_CHECK_PORT: 8083
+    ports:
+      - "9093:9090"      # 메트릭 포트
+      - "8083:8080"      # 헬스 체크 포트
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bss-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 해지 처리 서비스
+  termination-processor:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.consumer
+    container_name: bss-termination-processor
+    environment:
+      RABBITMQ_URL: amqp://admin:secretpassword@rabbitmq:5672/
+      QUEUE_NAME: bss_single_queue
+      PROCESSOR_TYPE: TERMINATION
+      MONITORING_ENABLED: "true"
+      LOG_LEVEL: INFO
+      METRICS_PORT: 9094
+      HEALTH_CHECK_PORT: 8084
+    ports:
+      - "9094:9090"      # 메트릭 포트
+      - "8084:8080"      # 헬스 체크 포트
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bss-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# 볼륨 정의
+volumes:
+  rabbitmq_data:
+    driver: local
+
+# 네트워크 정의
+networks:
+  bss-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

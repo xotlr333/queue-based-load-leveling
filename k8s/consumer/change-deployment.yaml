@@ -1,0 +1,220 @@
+# 파일 경로: k8s/consumer/change-deployment.yaml
+# 명의변경처리서비스 배포 설정
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: change-processor
+  namespace: bss-queue-system
+  labels:
+    app: bss-queue-pattern
+    component: consumer
+    processor-type: change
+    tier: backend
+spec:
+  replicas: 1  # 명의변경은 낮은 빈도 (HPA로 자동 조정)
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: bss-queue-pattern
+      component: consumer
+      processor-type: change
+  template:
+    metadata:
+      labels:
+        app: bss-queue-pattern
+        component: consumer
+        processor-type: change
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: default
+      
+      # 초기화 컨테이너 - RabbitMQ 연결 대기
+      initContainers:
+      - name: wait-for-rabbitmq
+        image: busybox:1.35
+        command:
+        - 'sh'
+        - '-c'
+        - |
+          until nc -z $RABBITMQ_HOST $RABBITMQ_PORT; do
+            echo "Waiting for RabbitMQ..."
+            sleep 2
+          done
+          echo "RabbitMQ is ready!"
+        env:
+        - name: RABBITMQ_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: bss-config
+              key: RABBITMQ_HOST
+        - name: RABBITMQ_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: bss-config
+              key: RABBITMQ_PORT
+      
+      containers:
+      - name: change-processor
+        image: bss-consumer:latest
+        imagePullPolicy: IfNotPresent
+        
+        # 컨테이너 실행 명령
+        command: ["python", "-m", "src.consumer.change_processor"]
+        
+        ports:
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: health
+          containerPort: 8080
+          protocol: TCP
+        
+        # 환경 변수 설정
+        env:
+        - name: PYTHONPATH
+          value: "/app"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: PROCESSOR_TYPE
+          value: "CHANGE"
+        - name: CONSUMER_TAG
+          value: "change-processor"
+        
+        # ConfigMap 및 Secret 환경 변수
+        envFrom:
+        - configMapRef:
+            name: bss-config
+        - secretRef:
+            name: bss-secrets
+        
+        # RabbitMQ 연결 URL 구성
+        env:
+        - name: RABBITMQ_URL
+          value: "amqp://$(RABBITMQ_USERNAME):$(RABBITMQ_PASSWORD)@$(RABBITMQ_HOST):$(RABBITMQ_PORT)$(RABBITMQ_VHOST)"
+        
+        # 리소스 설정
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        
+        # 라이프니스 프로브
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: health
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        # 레디니스 프로브
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: health
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # 시작 프로브
+        startupProbe:
+          httpGet:
+            path: /health
+            port: health
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10
+        
+        # 볼륨 마운트
+        volumeMounts:
+        - name: logging-config
+          mountPath: /app/config/logging.conf
+          subPath: logging.conf
+        - name: log-volume
+          mountPath: /var/log/bss
+        
+        # 보안 컨텍스트
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      
+      # 볼륨 설정
+      volumes:
+      - name: logging-config
+        configMap:
+          name: logging-config
+      - name: log-volume
+        emptyDir: {}
+      
+      # 파드 보안 설정
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # 스케줄링 설정
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: processor-type
+                  operator: In
+                  values:
+                  - change
+              topologyKey: kubernetes.io/hostname
+      
+      # DNS 설정
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+
+---
+# Change Processor 서비스
+apiVersion: v1
+kind: Service
+metadata:
+  name: change-processor-service
+  namespace: bss-queue-system
+  labels:
+    app: bss-queue-pattern
+    component: consumer
+    processor-type: change
+spec:
+  type: ClusterIP
+  selector:
+    app: bss-queue-pattern
+    component: consumer
+    processor-type: change
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: health
+    port: 8080
+    targetPort: 8080
+    protocol: TCP

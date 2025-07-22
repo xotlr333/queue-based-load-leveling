@@ -1,0 +1,214 @@
+# 파일 경로: k8s/consumer/hpa.yaml
+# Horizontal Pod Autoscaler 설정 - Consumer 서비스들
+
+# 가입처리서비스 HPA (가장 높은 트래픽 예상)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: subscription-processor-hpa
+  namespace: bss-queue-system
+  labels:
+    app: bss-queue-pattern
+    component: consumer
+    processor-type: subscription
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: subscription-processor
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  # CPU 기반 스케일링
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # 메모리 기반 스케일링
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # 사용자 정의 메트릭 (큐 길이 기반) - RabbitMQ Prometheus Exporter 필요
+  # - type: External
+  #   external:
+  #     metric:
+  #       name: rabbitmq_queue_messages_ready
+  #       selector:
+  #         matchLabels:
+  #           queue: bss_single_queue
+  #     target:
+  #       type: AverageValue
+  #       averageValue: "50"  # 큐에 50개 이상 메시지가 있으면 스케일링
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+# 번호이동처리서비스 HPA (중간 트래픽)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mnp-processor-hpa
+  namespace: bss-queue-system
+  labels:
+    app: bss-queue-pattern
+    component: consumer
+    processor-type: mnp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mnp-processor
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+# 명의변경처리서비스 HPA (낮은 트래픽)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: change-processor-hpa
+  namespace: bss-queue-system
+  labels:
+    app: bss-queue-pattern
+    component: consumer
+    processor-type: change
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: change-processor
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 180
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 90
+      - type: Pods
+        value: 1
+        periodSeconds: 90
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 120
+      selectPolicy: Min
+
+---
+# 해지처리서비스 HPA (낮은 트래픽)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: termination-processor-hpa
+  namespace: bss-queue-system
+  labels:
+    app: bss-queue-pattern
+    component: consumer
+    processor-type: termination
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: termination-processor
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 180
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 90
+      - type: Pods
+        value: 1
+        periodSeconds: 90
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 120
+      selectPolicy: Min

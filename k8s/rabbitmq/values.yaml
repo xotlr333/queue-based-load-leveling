@@ -1,0 +1,126 @@
+# 파일 경로: k8s/rabbitmq/values.yaml
+# RabbitMQ Helm Chart 커스텀 설정
+
+# RabbitMQ 기본 설정
+replicaCount: 1
+
+auth:
+  username: admin
+  password: secretpassword
+  erlangCookie: "SWQOKODSQALRPCLNMEQG"
+
+# 클러스터링 설정 (단일 노드로 시작, 확장 가능)
+clustering:
+  enabled: false
+  forceBoot: false
+
+# 리소스 설정
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# 퍼시스턴스 설정
+persistence:
+  enabled: true
+  storageClass: ""  # 기본 스토리지 클래스 사용
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+# 서비스 설정
+service:
+  type: ClusterIP  # Minikube 환경에서는 ClusterIP 사용
+  ports:
+    amqp: 5672
+    amqpTls: 5671
+    dist: 25672
+    manager: 15672
+    epmd: 4369
+    metrics: 9419
+
+# 메트릭 및 모니터링
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false  # Prometheus Operator가 없는 환경
+  prometheusRule:
+    enabled: false
+
+# RabbitMQ 관리 UI 설정
+managementUI:
+  enabled: true
+
+# RabbitMQ 플러그인 설정
+plugins: "rabbitmq_management rabbitmq_peer_discovery_k8s rabbitmq_prometheus"
+
+# 환경별 설정
+extraEnvVars:
+  - name: RABBITMQ_VM_MEMORY_HIGH_WATERMARK
+    value: "0.6"
+  - name: RABBITMQ_DISK_FREE_LIMIT
+    value: "1GB"
+
+# RabbitMQ 설정 파일
+extraConfiguration: |
+  # 큐 메시지 TTL 기본값
+  default_vhost = /
+  default_user = admin
+  default_pass = secretpassword
+  
+  # 메모리 및 디스크 설정
+  vm_memory_high_watermark.relative = 0.6
+  disk_free_limit.absolute = 1GB
+  
+  # 클러스터 설정
+  cluster_formation.peer_discovery_backend = rabbit_peer_discovery_k8s
+  cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+  cluster_formation.node_cleanup.interval = 30
+  cluster_formation.node_cleanup.only_log_warning = true
+  cluster_partition_handling = autoheal
+  
+  # 로그 설정
+  log.console = true
+  log.console.level = info
+  log.file.level = info
+
+# NodeSelector 및 Affinity (필요시)
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# 보안 컨텍스트
+podSecurityContext:
+  fsGroup: 999
+  runAsUser: 999
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 999
+
+# 라이프니스 및 레디니스 프로브
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  timeoutSeconds: 20
+  periodSeconds: 30
+  failureThreshold: 6
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  timeoutSeconds: 20
+  periodSeconds: 30
+  failureThreshold: 3
+  successThreshold: 1
+
+# PodDisruptionBudget
+pdb:
+  create: false
+  minAvailable: 1
