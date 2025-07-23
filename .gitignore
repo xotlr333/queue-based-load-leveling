@@ -210,7 +210,6 @@ config/local.yaml
 
 # Project specific
 results/
-experiments/
 data/
 notebooks/
 
