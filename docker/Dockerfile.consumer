@@ -1,62 +1,17 @@
-# 파일 경로: docker/Dockerfile.consumer
-# Consumer 서비스용 Dockerfile (4개 처리 서비스 통합)
-
 FROM python:3.9-slim
 
-# 메타데이터
-LABEL maintainer="BSS Queue Pattern Team"
-LABEL description="BSS Queue-Based Load Leveling Pattern - Consumer Services"
-LABEL version="1.0.0"
-
-# 시스템 패키지 업데이트 및 필수 도구 설치
-RUN apt-get update && apt-get install -y \
-    curl \
-    netcat-traditional \
-    && rm -rf /var/lib/apt/lists/*
-
-# 작업 디렉토리 설정
 WORKDIR /app
 
-# Python 의존성 파일 복사 및 설치
+# Python 의존성 설치
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 소스 코드 복사
-COPY src/ ./src/
+# Consumer 스크립트 복사
+COPY simple_consumer.py .
 
-# 시작 스크립트 복사
-COPY docker/start-consumer.sh ./start-consumer.sh
-RUN chmod +x ./start-consumer.sh
-
-# 설정 파일 디렉토리 생성
-RUN mkdir -p /app/config /var/log/bss
-
-# 환경 변수 설정
-ENV PYTHONPATH=/app
+# Python Path 설정
+ENV PYTHONPATH="/app"
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
 
-# 기본 환경 변수 (k8s ConfigMap에서 오버라이드)
-ENV RABBITMQ_URL=amqp://admin:secretpassword@rabbitmq:5672/
-ENV QUEUE_NAME=bss_single_queue
-ENV MONITORING_ENABLED=true
-ENV LOG_LEVEL=INFO
-ENV PROCESSOR_TYPE=SUBSCRIPTION
-ENV METRICS_PORT=9090
-ENV HEALTH_CHECK_PORT=8080
-
-# 포트 노출
-EXPOSE 9090 8080
-
-# 비특권 사용자 생성 및 권한 설정
-RUN groupadd -r bssapp && useradd -r -g bssapp bssapp
-RUN chown -R bssapp:bssapp /app /var/log/bss
-USER bssapp
-
-# 헬스 체크 (각 Consumer 타입별로 다른 엔드포인트)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
-
-# 실행 명령 (환경변수 PROCESSOR_TYPE에 따라 다른 서비스 실행)
-CMD ["./start-consumer.sh"]
+# Consumer 실행
+CMD ["python", "simple_consumer.py"]

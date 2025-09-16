@@ -45,6 +45,8 @@ spec:
       cpu: "100m"
       memory: "128Mi"
     type: Container
-  - default:
-      storage: "5Gi"
+  - max:
+      storage: "10Gi"
+    min:
+      storage: "1Gi"
     type: PersistentVolumeClaim

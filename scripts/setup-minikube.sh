@@ -1,33 +1,30 @@
-# ÆÄÀÏ °æ·Î: scripts/setup-minikube.sh
-# Minikube È¯°æ ¼³Á¤ ½ºÅ©¸³Æ®
-
 #!/bin/bash
 
 set -e
 
-echo "=== BSS Queue-Based Load Leveling ÆĞÅÏ - Minikube È¯°æ ¼³Á¤ ==="
+echo "=== BSS Queue-Based Load Leveling í”„ë¡œì íŠ¸ - Minikube í™˜ê²½ ì„¤ì • ==="
 
-# Minikube ½ÃÀÛ
-echo "1. Minikube ½ÃÀÛ Áß..."
-minikube start --memory=8192 --cpus=4 --disk-size=20g --driver=docker
+# Minikube ì‹œì‘
+echo "1. Minikube ì‹œì‘ ì¤‘..."
+minikube start --memory=6144 --cpus=4 --disk-size=20g --driver=docker
 
-# ¾Öµå¿Â È°¼ºÈ­
-echo "2. ÇÊ¼ö ¾Öµå¿Â È°¼ºÈ­ Áß..."
+# ì• ë“œì˜¨ í™œì„±í™”
+echo "2. í•„ìˆ˜ ì• ë“œì˜¨ í™œì„±í™” ì¤‘..."
 minikube addons enable ingress
 minikube addons enable metrics-server
 
-# Docker È¯°æ ¼³Á¤
-echo "3. Docker È¯°æ ¼³Á¤ Áß..."
+# Docker í™˜ê²½ ì„¤ì •
+echo "3. Docker í™˜ê²½ ì„¤ì • ì¤‘..."
 eval $(minikube docker-env)
 
-# Helm ¼³Ä¡ È®ÀÎ
-echo "4. Helm ¼³Ä¡ È®ÀÎ Áß..."
+# Helm ì„¤ì¹˜ í™•ì¸
+echo "4. Helm ì„¤ì¹˜ í™•ì¸ ì¤‘..."
 if ! command -v helm &> /dev/null; then
-    echo "HelmÀÌ ¼³Ä¡µÇÁö ¾Ê¾Ò½À´Ï´Ù. ¼³Ä¡¸¦ ÁøÇàÇÕ´Ï´Ù..."
+    echo "Helmì´ ì„¤ì¹˜ë˜ì–´ ìˆì§€ ì•ŠìŠµë‹ˆë‹¤. ì„¤ì¹˜ë¥¼ ì‹œì‘í•©ë‹ˆë‹¤..."
     curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 fi
 
-echo "5. Minikube ¼³Á¤ ¿Ï·á!"
+echo "5. Minikube ì„¤ì • ì™„ë£Œ!"
 echo "   - IP: $(minikube ip)"
 echo "   - Dashboard: minikube dashboard"
-echo "   - »óÅÂ: $(minikube status)"
+echo "   - ìƒíƒœ: $(minikube status)"

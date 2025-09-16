@@ -1,0 +1,27 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# 시스템 패키지 설치
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Python 의존성 설치
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 향상된 Producer 스크립트 복사
+COPY enhanced_producer.py .
+
+# 환경 변수 설정
+ENV PYTHONPATH="/app"
+ENV PYTHONUNBUFFERED=1
+ENV MONITORING_ENABLED=true
+
+EXPOSE 8000
+
+# 헬스체크 추가
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# 향상된 Producer 실행
+CMD ["python", "-m", "uvicorn", "enhanced_producer:app", "--host", "0.0.0.0", "--port", "8000"]

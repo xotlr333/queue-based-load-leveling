@@ -55,10 +55,8 @@ spec:
   - name: http
     port: 80
     targetPort: 8000
-    nodePort: 30080  # 외부에서 접근할 포트
     protocol: TCP
   - name: metrics
     port: 9090
     targetPort: 9090
-    nodePort: 30090
     protocol: TCP

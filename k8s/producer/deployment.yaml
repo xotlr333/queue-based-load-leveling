@@ -58,6 +58,8 @@ spec:
             configMapKeyRef:
               name: bss-config
               key: RABBITMQ_PORT
+        securityContext:
+          runAsUser: 0
       
       containers:
       - name: producer

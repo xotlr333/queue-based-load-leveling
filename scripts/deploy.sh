@@ -1,19 +1,16 @@
-# ÆÄÀÏ °æ·Î: scripts/deploy.sh
-# ÀüÃ¼ ½Ã½ºÅÛ ¹èÆ÷ ½ºÅ©¸³Æ®
-
 #!/bin/bash
 
 set -e
 
-echo "=== BSS Queue-Based Load Leveling ÆĞÅÏ ¹èÆ÷ ==="
+echo "=== BSS Queue-Based Load Leveling ì‹œìŠ¤í…œ ë°°í¬ ==="
 
-# 1. ³×ÀÓ½ºÆäÀÌ½º ¹× ±âº» ¼³Á¤
-echo "1. ³×ÀÓ½ºÆäÀÌ½º ¹× ¼³Á¤ ¹èÆ÷ Áß..."
+# 1. ë„¤ì„ìŠ¤í˜ì´ìŠ¤ ë° ê¸°ë³¸ ì„¤ì •
+echo "1. ë„¤ì„ìŠ¤í˜ì´ìŠ¤ ë° ì„¤ì • ì ìš© ì¤‘..."
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap/
 
-# 2. RabbitMQ ¼³Ä¡
-echo "2. RabbitMQ ¼³Ä¡ Áß..."
+# 2. RabbitMQ ì„¤ì¹˜
+echo "2. RabbitMQ ì„¤ì¹˜ ì¤‘..."
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo update
 
@@ -22,26 +19,26 @@ helm install rabbitmq bitnami/rabbitmq \
   --values k8s/rabbitmq/values.yaml \
   --wait
 
-# 3. Docker ÀÌ¹ÌÁö ºôµå
-echo "3. Docker ÀÌ¹ÌÁö ºôµå Áß..."
+# 3. Docker ì´ë¯¸ì§€ ë¹Œë“œ
+echo "3. Docker ì´ë¯¸ì§€ ë¹Œë“œ ì¤‘..."
 eval $(minikube docker-env)
 
 docker build -f docker/Dockerfile.producer -t bss-producer:latest .
 docker build -f docker/Dockerfile.consumer -t bss-consumer:latest .
 
-# 4. Producer ¼­ºñ½º ¹èÆ÷
-echo "4. Producer ¼­ºñ½º ¹èÆ÷ Áß..."
+# 4. Producer ë°°í¬
+echo "4. Producer ë°°í¬ ì¤‘..."
 kubectl apply -f k8s/producer/
 
-# 5. Consumer ¼­ºñ½º ¹èÆ÷
-echo "5. Consumer ¼­ºñ½º ¹èÆ÷ Áß..."
+# 5. Consumer ë°°í¬
+echo "5. Consumer ë°°í¬ ì¤‘..."
 kubectl apply -f k8s/consumer/
 
-# 6. ¹èÆ÷ »óÅÂ È®ÀÎ
-echo "6. ¹èÆ÷ »óÅÂ È®ÀÎ Áß..."
+# 6. ë°°í¬ ìƒíƒœ í™•ì¸
+echo "6. ë°°í¬ ìƒíƒœ í™•ì¸ ì¤‘..."
 kubectl get pods -n bss-queue-system
 kubectl get services -n bss-queue-system
 
-echo "7. ¹èÆ÷ ¿Ï·á!"
-echo "   - API Á¢±Ù: http://$(minikube ip):30080"
+echo "7. ë°°í¬ ì™„ë£Œ!"
+echo "   - API ì£¼ì†Œ: http://$(minikube ip):30080"
 echo "   - RabbitMQ UI: kubectl port-forward svc/rabbitmq 15672:15672 -n bss-queue-system"
